@@ -146,17 +146,28 @@ def japanese_to_romanji():
     files = os.listdir()
     for file in files:
         file_extension = os.path.splitext(file)[1].replace('.', '')
-        if file_extension in ['mp3', 'flac', 'wav', 'ape']:
+        if file_extension in music_extension:
             file_name = os.path.splitext(file)[0]
 
             # identify japanese character
             japanese_pattern = re.compile(r'[\u3040-\u30ff]+')
             japanese_match = japanese_pattern.search(file_name)
 
-            chinese_pattern = re.compile(r'[\u4e00-\u9fff]+')
-            chinese_match = chinese_pattern.search(file_name)
+            if not japanese_match:
+                chinese_pattern = re.compile(r'[\u4e00-\u9fff]+')
+                chinese_match = chinese_pattern.search(file_name)
 
-            if japanese_match:
+                if chinese_match:
+                    # There is a condition that japanese character is same as chinese character
+                    # So need to prompt user to insit convert or not to convert
+                    user_input = input(
+                        f"\n\nDo you want to convert {file_name} insit? (y/n) ")
+                    if user_input == "y":
+                        chinese_match = chinese_match.group()
+                else:
+                    chinese_match = None
+
+            if japanese_match or chinese_match:
                 # Convert Japanese to Romanji
                 kks = pykakasi.kakasi()
                 convert_result = kks.convert(file_name)
@@ -174,27 +185,7 @@ def japanese_to_romanji():
                 # rename lrc file if exist
                 rename_lrc_file(file_name, romanji)
             else:
-                print(f"\n\n{file_name} is unable to convert romanji")
-                # There is a condition that japanese character is same as chinese character
-                # So need to prompt user to insit convert or not to convert
-                if chinese_match:
-                    user_input = input(
-                        "Do you want to convert it insit? (y/n) ")
-                    if user_input == "y":
-                        # Convert Japanese to Romanji
-                        kks = pykakasi.kakasi()
-                        convert_result = kks.convert(file_name)
-                        romanji = ' '.join([item['hepburn'].strip()
-                                            for item in convert_result])
-                        romanji = romanji.replace("  ", " ").title()
-                        # rename file
-                        os.rename(file, f'{romanji}.{file_extension}')
-
-                        # save romanji to dictionary as key
-                        music_dict[romanji] = file_name
-
-                        # rename lrc file if exist
-                        rename_lrc_file(file_name, romanji)
+                print(f"{file_name} is unable to convert romanji")
 
     # save original file name to json file
     save_to_json()
