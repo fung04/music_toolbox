@@ -9,6 +9,10 @@ import music_tag
 music_extension = ['mp3', 'flac', 'wav', 'ape']
 music_dict = {}
 
+# regex pattern for japanese and chinese character
+japanese_pattern = re.compile(r'[\u3040-\u30ff]+')
+chinese_pattern = re.compile(r'[\u4e00-\u9fff]+')
+
 
 def save_to_json():
     # save music_dict to json file
@@ -17,62 +21,62 @@ def save_to_json():
     music_json.close()
 
 
-def chinese_to_pinyin():
+# loop through file directory and return file, file name and file extension
+def get_file_info():
     files = os.listdir()
     for file in files:
         file_extension = os.path.splitext(file)[1].replace('.', '')
         if file_extension in music_extension:
             file_name = os.path.splitext(file)[0]
+            yield file, file_extension, file_name
 
-            # identify chinese character
-            chinese_pattern = re.compile(r'[\u4e00-\u9fff]+')
-            chinese_match = chinese_pattern.search(file_name)
 
-            if chinese_match:
-                # convert chinese to pinyin
-                pinyin = ' '.join(lazy_pinyin(file_name)).title()
-                pinyin = pinyin.replace("  ", " ")
-                print(f"{file_name} -> {pinyin}.{file_extension}")
+def chinese_to_pinyin():
+    for file, file_extension, file_name in get_file_info():
 
-                # rename file
-                os.rename(file, f'{pinyin}.{file_extension}')
+        # identify chinese character in file name
+        chinese_match = chinese_pattern.search(file_name)
 
-                # rename lrc file if exist
-                rename_lrc_file(file_name, pinyin)
+        if chinese_match:
+            # convert chinese to pinyin
+            pinyin = ' '.join(lazy_pinyin(file_name)).title()
+            pinyin = pinyin.replace("  ", " ")
+            print(f"{file_name} -> {pinyin}.{file_extension}")
 
-                # save pinyin to dictionary as key
-                music_dict[pinyin] = file_name
-            else:
-                print(f"{file_name} is unable to covert pinyin")
+            # rename file
+            os.rename(file, f'{pinyin}.{file_extension}')
+
+            # rename lrc file if exist
+            rename_lrc_file(file_name, pinyin)
+
+            # save pinyin to dictionary as key
+            music_dict[pinyin] = file_name
+        else:
+            print(f"{file_name} is unable to covert pinyin")
 
     # save original file name to json file
     save_to_json()
 
 
 def music_list_to_file():
-    files = os.listdir()
 
     # read music_list.json file
     with open("music_list.json", "r", encoding="utf8") as music_list:
         music_dict = json.load(music_list)
 
-    for file in files:
-        file_extension = os.path.splitext(file)[1].replace('.', '')
-        if file_extension in music_extension:
-            file_name = os.path.splitext(file)[0]
+    for file, file_extension, file_name in get_file_info():
 
-            # try to find file name in music_dict
-            try:
-                os.rename(file, f'{music_dict[file_name]}.{file_extension}')
-                rename_lrc_file(file_name, music_dict[file_name])
-            except KeyError:
-                print(f"{file_name} not found in music_list.json")
-            except FileExistsError:
-                print(f"{file_name} already exist")
+        # try to find file name in music_dict
+        try:
+            os.rename(file, f'{music_dict[file_name]}.{file_extension}')
+            rename_lrc_file(file_name, music_dict[file_name])
+        except KeyError:
+            print(f"{file_name} not found in music_list.json")
+        except FileExistsError:
+            print(f"{file_name} already exist")
 
 
 def tag_to_filename():
-    files = os.listdir()
     illegal_character = {
         "/": ", ",
         ":": "-",
@@ -84,137 +88,119 @@ def tag_to_filename():
         ">": ")",
     }
 
-    for file in files:
-        file_extension = os.path.splitext(file)[1].replace('.', '')
+    for file, file_extension, file_name in get_file_info():
 
-        if file_extension in music_extension:
-            file_name = os.path.splitext(file)[0]
+        # get tag info from music file then rename file
+        tag_info = music_tag.load_file(file)
+        tag_name = f"{tag_info['title']} - {tag_info['artist']}"
 
-            # get tag info from music file then rename file
-            tag_info = music_tag.load_file(file)
-            tag_name = f"{tag_info['title']} - {tag_info['artist']}"
+        # idetify and replace Windows illegal character
+        for i, j in illegal_character.items():
+            tag_name = tag_name.replace(i, j)
+        print(f"{file_name} -> {tag_name}.{file_extension}")
 
-            # idetify and replace Windows illegal character
-            for i, j in illegal_character.items():
-                tag_name = tag_name.replace(i, j)
-            print(f"{file_name} -> {tag_name}.{file_extension}")
+        # rename file
+        os.rename(file, f'{tag_name}.{file_extension}')
 
-            # rename file
-            os.rename(file, f'{tag_name}.{file_extension}')
-
-            # rename lrc file if exist
-            rename_lrc_file(file_name, tag_name)
+        # rename lrc file if exist
+        rename_lrc_file(file_name, tag_name)
 
 
 def track_to_file():
-    files = os.listdir()
 
     # get leading number from user
     print("Enter value 0 for no leading number")
     leading_number = input("Enter leading number: ")
 
-    for file in files:
-        file_extension = os.path.splitext(file)[1].replace('.', '')
+    for file, file_extension, file_name in get_file_info():
 
-        if file_extension in music_extension:
-            file_name = os.path.splitext(file)[0]
+        # get track number from music file
+        tag_info = music_tag.load_file(file)
 
-            # get track number from music file
-            tag_info = music_tag.load_file(file)
+        # identify track number is not empty
+        track_number = int(tag_info['tracknumber'])
 
-            # identify track number is not empty
-            track_number = int(tag_info['tracknumber'])
-
-            if track_number:
-                if leading_number == "0" or leading_number == "":
-                    file_with_track_number = f"{track_number:02d}. {file_name}"
-                else:
-                    file_with_track_number = f"{leading_number}.{track_number:02d}. {file_name}"
+        if track_number:
+            if leading_number == "0" or leading_number == "":
+                file_with_track_number = f"{track_number:02d}. {file_name}"
             else:
-                file_with_track_number = f"{file_name}"
+                file_with_track_number = f"{leading_number}.{track_number:02d}. {file_name}"
+        else:
+            file_with_track_number = f"{file_name}"
 
-            print(f"{file_name} -> {file_with_track_number}.{file_extension}")
+        print(f"{file_name} -> {file_with_track_number}.{file_extension}")
 
-            # rename file
-            os.rename(file, f'{file_with_track_number}.{file_extension}')
+        # rename file
+        os.rename(file, f'{file_with_track_number}.{file_extension}')
 
-            # rename lrc file if exist
-            rename_lrc_file(file_name, file_with_track_number)
+        # rename lrc file if exist
+        rename_lrc_file(file_name, file_with_track_number)
 
 
 def japanese_to_romanji():
-    files = os.listdir()
-    for file in files:
-        file_extension = os.path.splitext(file)[1].replace('.', '')
-        if file_extension in music_extension:
-            file_name = os.path.splitext(file)[0]
+    for file, file_extension, file_name in get_file_info():
 
-            # identify japanese character
-            japanese_pattern = re.compile(r'[\u3040-\u30ff]+')
-            japanese_match = japanese_pattern.search(file_name)
+        # identify japanese character in file name
+        japanese_match = japanese_pattern.search(file_name)
 
-            if not japanese_match:
-                chinese_pattern = re.compile(r'[\u4e00-\u9fff]+')
-                chinese_match = chinese_pattern.search(file_name)
+        if not japanese_match:
+            # identify chinese character in file name
+            chinese_match = chinese_pattern.search(file_name)
 
-                if chinese_match:
-                    # There is a condition that japanese character is same as chinese character
-                    # So need to prompt user to insit convert or not to convert
-                    user_input = input(
-                        f"\n\nDo you want to convert {file_name} insit? (y/n) ")
-                    if user_input == "y":
-                        chinese_match = chinese_match.group()
-                else:
-                    chinese_match = None
-
-            if japanese_match or chinese_match:
-                # Convert Japanese to Romanji
-                kks = pykakasi.kakasi()
-                convert_result = kks.convert(file_name)
-                romanji = ' '.join([item['hepburn'].strip()
-                                    for item in convert_result])
-                romanji = romanji.replace("  ", " ").title()
-                print(f"{file_name} -> {romanji}.{file_extension}")
-
-                # rename file
-                os.rename(file, f'{romanji}.{file_extension}')
-
-                # save romanji to dictionary as key
-                music_dict[romanji] = file_name
-
-                # rename lrc file if exist
-                rename_lrc_file(file_name, romanji)
+            if chinese_match:
+                # There is a condition that japanese character is same as chinese character
+                # So need to prompt user to insit convert or not to convert
+                user_input = input(
+                    f"\n\nDo you want to convert {file_name} insit? (y/n) ")
+                if user_input == "y":
+                    chinese_match = chinese_match.group()
             else:
-                print(f"{file_name} is unable to convert romanji")
+                chinese_match = None
+
+        if japanese_match or chinese_match:
+            # Convert Japanese to Romanji
+            kks = pykakasi.kakasi()
+            convert_result_dict = kks.convert(file_name)
+            romanji = ' '.join([item['hepburn'].strip()
+                                for item in convert_result_dict])
+            romanji = romanji.replace("  ", " ").title()
+            print(f"{file_name} -> {romanji}.{file_extension}")
+
+            # rename file
+            os.rename(file, f'{romanji}.{file_extension}')
+
+            # save romanji to dictionary as key
+            music_dict[romanji] = file_name
+
+            # rename lrc file if exist
+            rename_lrc_file(file_name, romanji)
+        else:
+            print(f"{file_name} is unable to convert romanji")
 
     # save original file name to json file
     save_to_json()
 
 
 def remove_leading_number():
-    files = os.listdir()
-    for file in files:
-        file_extension = os.path.splitext(file)[1].replace('.', '')
-        if file_extension in music_extension:
-            file_name = os.path.splitext(file)[0]
+    for file, file_extension, file_name in get_file_info():
 
-            # remove leading number with regex
-            # removeable pattern are:  01 Song Title  (with or without space)
-            #                          01. Song Title (with or without space)
-            #                          01- Song Title (with or without space)
-            #                          1.11 - Song Title (with or without space)
-            #                          1.11 . Song Title (with or without space)
+        # remove leading number with regex
+        # removeable pattern are:  01 Song Title  (with or without space)
+        #                          01. Song Title (with or without space)
+        #                          01- Song Title (with or without space)
+        #                          1.11 - Song Title (with or without space)
+        #                          1.11 . Song Title (with or without space)
 
-            new_file_name = re.sub('^\d*[-.]?\d*[-.\s]*', '', file_name)
+        new_file_name = re.sub('^\d*[-.]?\d*[-.\s]*', '', file_name)
 
-            # get user confirmation before rename file
-            print(f"{file_name}.{file_extension} -> {new_file_name}.{file_extension}")
+        # get user confirmation before rename file
+        print(f"{file_name}.{file_extension} -> {new_file_name}.{file_extension}")
 
-            # rename file
-            os.rename(file, f'{new_file_name}.{file_extension}')
+        # rename file
+        os.rename(file, f'{new_file_name}.{file_extension}')
 
-            # rename lrc file if exist
-            rename_lrc_file(file_name, new_file_name)
+        # rename lrc file if exist
+        rename_lrc_file(file_name, new_file_name)
 
 
 def rename_lrc_file(old_name, new_name):
@@ -222,41 +208,34 @@ def rename_lrc_file(old_name, new_name):
         os.rename(f"{old_name}.lrc", f"{new_name}.lrc")
 
 
-def music_tools():
+def music_tool_menu():
+    # get user input
+    user_input = input("\n\nSelect option: \n\n"
+                       "[1] Music Tag info to File\n"
+                       "[2] Covert Chinese to Pinyin\n"
+                       "[3] Convert Japanese to Romanji\n"
+                       "[4] Add Track Number to File\n"
+                       "[5] Remove Leading Number\n"
+                       "[6] music_list.json to File\n\n"
+                       "Enter option: ")
+
+    # check user input
+    if user_input == "1":
+        tag_to_filename()
+    elif user_input == "2":
+        chinese_to_pinyin()
+    elif user_input == "3":
+        japanese_to_romanji()
+    elif user_input == "4":
+        track_to_file()
+    elif user_input == "5":
+        remove_leading_number()
+    elif user_input == "6":
+        music_list_to_file()
+    else:
+        print("Invalid option")
+
+
+if __name__ == "__main__":
     while True:
-        print("\n[1] Music Tag info to File")
-        print("[2] Covert Chinese to Pinyin")
-        print("[3] Convert Japanese to Romanji")
-        print("[4] Add Track Number to File")
-        print("[5] Remove Leading Number")
-        print("[6] music_list.json to File")
-
-        user_choice = int(input("\nChoose your option: "))
-
-        if user_choice == 1:
-            tag_to_filename()
-        elif user_choice == 2:
-            user_opt = input("Do you want to convert to pinyin? (Y/N) : ")
-            if user_opt == 'Y' or user_opt == 'y':
-                chinese_to_pinyin()
-            else:
-                print("Converting back to chinese")
-                music_list_to_file()
-        elif user_choice == 3:
-            user_opt = input("Do you want to convert to romanji? (Y/N) : ")
-            if user_opt == 'Y' or user_opt == 'y':
-                japanese_to_romanji()
-            else:
-                print("Converting back to japanese")
-                music_list_to_file()
-        elif user_choice == 4:
-            track_to_file()
-        elif user_choice == 5:
-            remove_leading_number()
-        elif user_choice == 6:
-            music_list_to_file()
-        else:
-            print("Invalid option")
-
-
-music_tools()
+        music_tool_menu()
