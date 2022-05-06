@@ -239,12 +239,12 @@ def rename_lrc_file(old_name, new_name):
 def music_tool_menu():
     # get user input
     user_input = input("\n\nSelect option: \n\n"
-                       "[1] Music Tag info to File\n"
+                       "[1] Music tag info to File\n"
                        "[2] Covert Chinese to Pinyin\n"
                        "[3] Convert Japanese to Romanji\n"
                        "[4] Add Track Number to File\n"
                        "[5] Remove Leading Number\n"
-                       "[6] Embed Lyrics to metadata \n"
+                       "[6] Embed Lyrics to Music tag \n"
                        "[7] music_list.json to File\n\n"
                        "Enter option: ")
 
