@@ -203,6 +203,34 @@ def remove_leading_number():
         rename_lrc_file(file_name, new_file_name)
 
 
+def lyrics_to_metadata():
+    for file, file_extension, file_name in get_file_info():
+
+        # get metadata from music file
+        tag_info = music_tag.load_file(file)
+        
+        # check if lrc file exits
+        if os.path.isfile(file_name + '.lrc'):
+            with open(file_name + '.lrc', 'r', encoding='utf-8') as f:
+                if tag_info['lyrics']:
+                    print("Conflict: lyrics already exist")
+                    print(f"\n\n Lyric from metadata:\n {tag_info['lyrics']}")
+                    print(f"\n\n Lyric from lrc file:\n {f.read()}")
+                    user_input = input(
+                        f"\n\nDo you want to overwrite lyrics? (y/n) ")
+                    if user_input == "y":
+                        tag_info['lyrics'] = f.read()
+                        tag_info.save()
+                    else:
+                        print("Lyrics not overwritten")
+                else:
+                    tag_info['lyrics'] = f.read()
+                    tag_info.save()            
+        else:
+            print(f"{file_name}.lrc not found")   
+            
+
+
 def rename_lrc_file(old_name, new_name):
     if os.path.isfile(f"{old_name}.lrc"):
         os.rename(f"{old_name}.lrc", f"{new_name}.lrc")
@@ -216,7 +244,8 @@ def music_tool_menu():
                        "[3] Convert Japanese to Romanji\n"
                        "[4] Add Track Number to File\n"
                        "[5] Remove Leading Number\n"
-                       "[6] music_list.json to File\n\n"
+                       "[6] Embed Lyrics to metadata \n"
+                       "[7] music_list.json to File\n\n"
                        "Enter option: ")
 
     # check user input
@@ -231,8 +260,11 @@ def music_tool_menu():
     elif user_input == "5":
         remove_leading_number()
     elif user_input == "6":
+        lyrics_to_metadata()
+    elif user_input == "7":
         music_list_to_file()
     else:
+
         print("Invalid option")
 
 
