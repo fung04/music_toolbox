@@ -7,7 +7,7 @@ import pykakasi
 from pypinyin import lazy_pinyin
 
 # add music file extension to list if not exist here
-music_extension = ['mp3', 'flac', 'ape', 'm4a','dsf','aif']
+music_extension = ['mp3', 'flac', 'ape', 'm4a', 'dsf', 'aif']
 music_dict = {}
 
 # regex pattern for japanese and chinese character
@@ -109,11 +109,12 @@ def tag_to_filename():
                 i = i + 1
                 tag_name = f'{tag_name} ({i})'
                 os.rename(file, f'{tag_name}.{file_extension}')
-                
+
             # rename lrc file if exist
             rename_lrc_file(file_name, tag_name)
         else:
             print(f"\n\nNo title for {file_name}\n\n")
+
 
 def track_to_file():
 
@@ -239,6 +240,7 @@ def lyrics_to_metadata():
         else:
             print(f"{file_name}.lrc not found")
 
+
 def filename_to_title():
     for file, file_extension, file_name in get_file_info():
 
@@ -265,17 +267,12 @@ def filename_to_title():
                 tag_info.save()
             else:
                 print("Comment not overwritten")
-        
+
 
 def rename_lrc_file(old_name, new_name):
     # rename and replace lrc file if exist
     if os.path.isfile(f"{old_name}.lrc"):
         os.rename(f"{old_name}.lrc", f"{new_name}.lrc")
-
-def chinese_mode():
-    chinese_to_pinyin()
-    lyrics_to_metadata()
-    filename_to_title()
 
 
 def music_tool_menu():
@@ -310,7 +307,9 @@ def music_tool_menu():
     elif user_input == "8":
         music_list_to_file()
     elif user_input == "chinese":
-        chinese_mode()
+        chinese_to_pinyin()
+        lyrics_to_metadata()
+        filename_to_title()
     else:
         print("Invalid option")
 
