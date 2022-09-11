@@ -1,12 +1,13 @@
-from pypinyin import lazy_pinyin
-import pykakasi
-import os
 import json
+import os
 import re
+
 import music_tag
+import pykakasi
+from pypinyin import lazy_pinyin
 
 # add music file extension to list if not exist here
-music_extension = ['mp3', 'flac', 'wav', 'ape']
+music_extension = ['mp3', 'flac', 'ape', 'm4a','dsf','aif']
 music_dict = {}
 
 # regex pattern for japanese and chinese character
@@ -97,14 +98,22 @@ def tag_to_filename():
         # idetify and replace Windows illegal character
         for i, j in illegal_character.items():
             tag_name = tag_name.replace(i, j)
-        print(f"{file_name} -> {tag_name}.{file_extension}")
 
-        # rename file
-        os.rename(file, f'{tag_name}.{file_extension}')
-
-        # rename lrc file if exist
-        rename_lrc_file(file_name, tag_name)
-
+        if tag_info['title']:
+            print(f"{file_name} -> {tag_name}.{file_extension}")
+            try:
+                # rename file
+                os.rename(file, f'{tag_name}.{file_extension}')
+            except FileExistsError:
+                i = 0
+                i = i + 1
+                tag_name = f'{tag_name} ({i})'
+                os.rename(file, f'{tag_name}.{file_extension}')
+                
+            # rename lrc file if exist
+            rename_lrc_file(file_name, tag_name)
+        else:
+            print(f"\n\nNo title for {file_name}\n\n")
 
 def track_to_file():
 
@@ -208,7 +217,7 @@ def lyrics_to_metadata():
 
         # get metadata from music file
         tag_info = music_tag.load_file(file)
-        
+
         # check if lrc file exits
         if os.path.isfile(file_name + '.lrc'):
             with open(file_name + '.lrc', 'r', encoding='utf-8') as f:
@@ -225,18 +234,52 @@ def lyrics_to_metadata():
                         print("Lyrics not overwritten")
                 else:
                     tag_info['lyrics'] = f.read()
-                    tag_info.save()            
+                    tag_info.save()
+                    print(f"The lyrics of ({file_name}) is embedded.")
         else:
-            print(f"{file_name}.lrc not found")   
-            
+            print(f"{file_name}.lrc not found")
 
+def filename_to_title():
+    for file, file_extension, file_name in get_file_info():
+
+        # get metadata from music file
+        tag_info = music_tag.load_file(file)
+
+        if not tag_info['comment']:
+            # backup tag_info['title'] to tage_info['comment']
+            tag_info['comment'] = tag_info['title']
+
+            # save file name to tag_info['title']
+            tag_info['title'] = file_name
+            print(f"Music Title: {tag_info['title']}")
+            tag_info.save()
+        else:
+            print(f"The comment: {tag_info['comment']} ")
+            user_input = input(
+                f"\n\nDo you want to overwrite comment? (y/n) ")
+            if user_input == "y":
+                tag_info['comment'] = tag_info['title']
+                # save file name to tag_info['title']
+                tag_info['title'] = file_name
+                print(f"Music Title: {tag_info['title']}")
+                tag_info.save()
+            else:
+                print("Comment not overwritten")
+        
 
 def rename_lrc_file(old_name, new_name):
+    # rename and replace lrc file if exist
     if os.path.isfile(f"{old_name}.lrc"):
         os.rename(f"{old_name}.lrc", f"{new_name}.lrc")
 
+def chinese_mode():
+    chinese_to_pinyin()
+    lyrics_to_metadata()
+    filename_to_title()
+
 
 def music_tool_menu():
+    tag_to_filename()
     # get user input
     user_input = input("\n\nSelect option: \n\n"
                        "[1] Music tag info to File\n"
@@ -244,8 +287,9 @@ def music_tool_menu():
                        "[3] Convert Japanese to Romanji\n"
                        "[4] Add Track Number to File\n"
                        "[5] Remove Leading Number\n"
-                       "[6] Embed Lyrics to Music tag \n"
-                       "[7] music_list.json to File\n\n"
+                       "[6] Embed Lyrics to Music lyric tag \n"
+                       "[7] Embed file name to Music title tag\n"
+                       "[8] music_list.json to File\n\n"
                        "Enter option: ")
 
     # check user input
@@ -262,9 +306,12 @@ def music_tool_menu():
     elif user_input == "6":
         lyrics_to_metadata()
     elif user_input == "7":
+        filename_to_title()
+    elif user_input == "8":
         music_list_to_file()
+    elif user_input == "chinese":
+        chinese_mode()
     else:
-
         print("Invalid option")
 
 
